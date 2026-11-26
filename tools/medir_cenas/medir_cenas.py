@@ -18,6 +18,7 @@ import json
 import statistics
 import sys
 from dataclasses import asdict, dataclass
+from itertools import pairwise
 from pathlib import Path
 
 import cv2
@@ -83,7 +84,7 @@ def load_frames(video: Path, wanted: set[int]) -> dict[int, np.ndarray]:
 
 
 def transition_window(cut_frame: int, fps: float) -> range:
-    w = max(2, int(round(fps * 0.4)))
+    w = max(2, round(fps * 0.4))
     return range(max(0, cut_frame - w), cut_frame + w + 1)
 
 
@@ -92,7 +93,7 @@ def motion_pairs(scene: Scene, fps: float) -> list[tuple[int, int]]:
     # Ignora as bordas da cena para não confundir a transição com movimento.
     margin = min(0.25, scene.duration * 0.15)
     t0, t1 = scene.start + margin, scene.end - margin
-    gap = max(1, int(round(fps / MOTION_SAMPLES_PER_SEC)))
+    gap = max(1, round(fps / MOTION_SAMPLES_PER_SEC))
     if t1 - t0 - gap / fps < 0.2:
         return []
     n = min(12, max(1, int((t1 - t0) * MOTION_SAMPLES_PER_SEC / 2)))
@@ -108,7 +109,7 @@ def classify_transition(cache: dict[int, np.ndarray], cut_frame: int, fps: float
     if min(float(f.mean()) for f in frames) < BLACK_LEVEL:
         return "preto"
 
-    diffs = sorted(float(cv2.absdiff(a, b).mean()) for a, b in zip(frames, frames[1:]))
+    diffs = sorted(float(cv2.absdiff(a, b).mean()) for a, b in pairwise(frames))
     # Num corte seco a mudança entre dois quadros vizinhos é muito maior que todas as outras;
     # numa transição suave ela se espalha por vários quadros parecidos.
     return "corte" if diffs[-1] >= 2.5 * max(diffs[-2], 0.5) else "suave"
@@ -240,9 +241,11 @@ def to_markdown(info: dict, summary: dict, scenes: list[Scene]) -> str:
     lines = [
         f"# Storyboard: {info['arquivo']}",
         "",
-        f"{info['largura']}x{info['altura']} @ {info['fps']}fps · {fmt_time(info['duracao'])} · "
-        f"**{summary['cenas']} cenas** · média **{summary['segundos_por_cena_media']}s/cena** "
-        f"(mediana {summary['segundos_por_cena_mediana']}s)",
+        (
+            f"{info['largura']}x{info['altura']} @ {info['fps']}fps · {fmt_time(info['duracao'])} · "
+            f"**{summary['cenas']} cenas** · média **{summary['segundos_por_cena_media']}s/cena** "
+            f"(mediana {summary['segundos_por_cena_mediana']}s)"
+        ),
         "",
         f"- Transições: {counts(summary['transicoes'])}",
         f"- Câmera: {counts(summary['camera'])}",

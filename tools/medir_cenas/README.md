@@ -14,7 +14,7 @@ com a transcrição:
 pip install -r requirements.txt
 ```
 
-Precisa de Python 3.9+. Não precisa de GPU.
+Precisa de Python 3.10+. Não precisa de GPU.
 
 ## Uso
 
